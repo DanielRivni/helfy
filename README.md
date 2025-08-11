@@ -1,73 +1,86 @@
-# Part 2: DevOps Implementation (Docker + TiDB + Kafka)
+# Part 2 - Simple Web App with TiDB, Kafka, Node.js, and React
 
-This sets up the full stack with Docker Compose:
-- **API**: Node/Express (same API as Part 1) + Kafka producer
-- **Client**: Nginx serving the static HTML
-- **Database**: Local TiDB cluster (PD, TiKV, TiDB) in Docker
-- **Kafka**: Single-broker Kafka (KRaft mode, no ZooKeeper)
-- **Auto DB init**: A one-off container seeds the schema and creates a default user
+This is **Part 2** of the SRE Assignment.  
+It includes:
+- Backend API (Node.js + Express)
+- Frontend client (React)
+- TiDB database
+- Kafka (Bitnami)
+- Zookeeper
 
-## Prerequisites (Windows)
-- Install **Docker Desktop** and start it.
-- Ensure ports **4000**, **3001**, **8080**, **9092** are free.
+Everything runs via Docker Compose.
 
-## Quick start
-```powershell
-cd .\part2
+---
+
+## 🚀 Quick Start
+
+### 1. Clone & Navigate
+```bash
+git clone <repo-url>
+cd part2
+```
+
+### 2. Setup `.env`
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+Ensure:
+```env
+DEFAULT_USER_EMAIL=admin@example.com
+DEFAULT_USER_PASSWORD=Admin12345!
+```
+
+### 3. Start Containers
+```bash
 docker compose up -d --build
 ```
 
-### What this does
-- Launches TiDB (PD + TiKV + TiDB)
-- Launches Kafka (bitnami/kafka in KRaft mode)
-- Builds and runs the API and Client images
-- Runs a `db-init` job that:
-  - waits for TiDB to be reachable
-  - applies `schema.sql`
-  - creates a default user (see env below)
-
-### Access
-- Client: http://localhost:8080
-- API:    http://localhost:3001
-- TiDB:   mysql client at localhost:4000
-- Kafka:  PLAINTEXT at localhost:9092
-
-## Default credentials (seeded by db-init)
-- Email: `admin@example.com`
-- Password: `Admin12345!`
-
-(Change them by editing `docker-compose.yml` environment for the `db-init` service.)
-
-## Environment
-The API reads DB and Kafka settings from env vars. In Docker, they’re provided by `docker-compose.yml`:
-
-```yaml
-environment:
-  PORT: 3001
-  TIDB_HOST: tidb
-  TIDB_PORT: 4000
-  TIDB_USER: root
-  TIDB_PASSWORD: ""
-  TIDB_DATABASE: myapp
-  TIDB_USE_SSL: "false"
-  KAFKA_BROKER: kafka:9092
+### 4. Initialize Database
+Create schema:
+```bash
+docker run -it --rm --network=part2_default mysql:8.0   mysql -h part2-tidb -P 4000 -u root -e "
+    CREATE DATABASE IF NOT EXISTS myapp;
+    USE myapp;
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      token VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  "
 ```
 
-## Common commands
-```powershell
-# View logs for a service
-docker compose logs -f api
-docker compose logs -f tidb
-docker compose logs -f kafka
-docker compose logs -f db-init
+### 5. Seed Default User
+```bash
+docker exec -it part2-api node src/seed.js
+```
 
-# Rebuild after code changes
-docker compose up -d --build api client
+---
 
-# Tear down everything
+## 🔑 Login Details
+- **Email:** `admin@example.com`
+- **Password:** `Admin12345!`
+
+Access:
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:3001
+
+---
+
+## 🛠 Services
+| Service   | Port  | Description          |
+|-----------|-------|----------------------|
+| API       | 3001  | Node.js Backend      |
+| Client    | 3000  | React Frontend       |
+| TiDB      | 4000  | SQL Database         |
+| Kafka     | 9092  | Message Broker       |
+| Zookeeper | 2181  | Kafka Coordination   |
+
+---
+
+## 🧹 Stop Everything
+```bash
 docker compose down -v
 ```
-
-## Notes
-- This TiDB setup is for **local development** only. For production, use TiDB Cloud or a proper TiDB cluster.
-- Kafka is configured with PLAINTEXT for local dev only.
