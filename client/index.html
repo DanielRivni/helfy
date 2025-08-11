@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Website</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    .card { border: 1px solid #ddd; padding: 16px; margin-bottom: 16px; max-width: 520px; }
+    input { width: 100%; padding: 8px; margin: 6px 0; }
+    button { padding: 8px 12px; cursor: pointer; margin-right: 8px; }
+    code { background: #f5f5f5; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Home Page</h1>
+
+  <div class="card">
+    <h3>Register</h3>
+    <input id="regEmail" type="email" placeholder="email" autocomplete="off" />
+    <input id="regPass" type="password" placeholder="password" autocomplete="new-password" />
+    <button type="button" onclick="register()">Register</button>
+    <div id="regOut"></div>
+  </div>
+
+  <div class="card">
+    <h3>Login</h3>
+    <input id="logEmail" type="email" placeholder="email" autocomplete="off" />
+    <input id="logPass" type="password" placeholder="password" autocomplete="current-password" />
+    <button type="button" onclick="login()">Login</button>
+    <div id="logOut"></div>
+  </div>
+
+  <div class="card">
+    <h3>Profile (requires token)</h3>
+    <div>Current token: <code id="tokenView">(none)</code></div>
+    <div style="margin-top:8px;">
+      <button type="button" onclick="profile()">Get Profile</button>
+      <button type="button" onclick="clearToken()">Clear token</button>
+    </div>
+    <div id="profOut"></div>
+  </div>
+
+<script>
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:3001'
+  : '/api'; // adjust if you reverse-proxy later
+
+let token = null;
+
+function setToken(t) {
+  token = t || null;
+  if (token) {
+    localStorage.setItem('token', token);
+  } else {
+    localStorage.removeItem('token');
+  }
+  document.getElementById('tokenView').textContent = token ? token.slice(0,16) + '...' : '(none)';
+}
+
+function clearToken() {
+  setToken(null);
+}
+
+function restoreToken() {
+  const saved = localStorage.getItem('token');
+  if (saved) setToken(saved);
+}
+
+restoreToken();
+
+async function register() {
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPass').value;
+  const out = document.getElementById('regOut');
+  out.textContent = '...';
+  try {
+    const r = await fetch(`${API}/api/register`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password })
+    });
+    const j = await r.json();
+    out.textContent = r.ok ? 'Registered ✅' : ('Error: ' + (j.error || r.statusText));
+  } catch (e) {
+    out.textContent = 'Network error';
+  }
+}
+
+async function login() {
+  const email = document.getElementById('logEmail').value.trim();
+  const password = document.getElementById('logPass').value;
+  const out = document.getElementById('logOut');
+  out.textContent = '...';
+  try {
+    const r = await fetch(`${API}/api/login`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password })
+    });
+    const j = await r.json();
+    if (r.ok) {
+      setToken(j.token);
+      out.textContent = 'Logged in ✅';
+    } else {
+      out.textContent = 'Error: ' + (j.error || r.statusText);
+    }
+  } catch (e) {
+    out.textContent = 'Network error';
+  }
+}
+
+async function profile() {
+  const out = document.getElementById('profOut');
+  out.textContent = '...';
+  try {
+    const r = await fetch(`${API}/api/profile`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    const j = await r.json();
+    out.textContent = r.ok ? JSON.stringify(j) : ('Error: ' + (j.error || r.statusText));
+  } catch (e) {
+    out.textContent = 'Network error';
+  }
+}
+</script>
+</body>
+</html>

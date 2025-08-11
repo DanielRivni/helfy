@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  pd:
+    image: pingcap/pd:latest
+    container_name: part2-pd
+    command:
+      - --name=pd
+      - --data-dir=/data/pd
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://pd:2379
+      - --advertise-peer-urls=http://pd:2380
+      - --initial-cluster=pd=http://pd:2380
+    ports:
+      - "2379:2379"
+    volumes:
+      - pd:/data/pd
+
+  tikv:
+    image: pingcap/tikv:latest
+    container_name: part2-tikv
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --data-dir=/data/tikv
+      - --pd=pd:2379
+    depends_on:
+      - pd
+    volumes:
+      - tikv:/data/tikv
+
+  tidb:
+    image: pingcap/tidb:latest
+    container_name: part2-tidb
+    command:
+      - --store=tikv
+      - --path=pd:2379
+      - --log-file=""
+    ports:
+      - "4000:4000"
+    depends_on:
+      - pd
+      - tikv
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: part2-kafka
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+    depends_on:
+      - zookeeper
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: part2-zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  api:
+    image: part2-api:latest
+    container_name: part2-api
+    env_file:
+      - .env
+    ports:
+      - "3001:3001"
+    depends_on:
+      - tidb
+      - kafka
+
+  client:
+    image: part2-client:latest
+    container_name: part2-client
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  pd:
+  tikv:
